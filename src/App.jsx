@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import { Copy, Check, ArrowLeft, Plus, LogIn, MessageSquare } from 'lucide-react'
+import { Copy, Check, ArrowLeft, Plus, LogIn, MessageSquare, Sun, Moon } from 'lucide-react'
 import './App.css'
 
 function generateInviteCode() {
@@ -14,9 +14,10 @@ function generateInviteCode() {
 function App() {
     const [searchParams, setSearchParams] = useSearchParams()
 
-    // User identity
+    // User identity & Theme
     const [userName, setUserName] = useState(localStorage.getItem('chat-name') || '')
     const [senderId, setSenderId] = useState(localStorage.getItem('chat-sender-id') || '')
+    const [theme, setTheme] = useState(localStorage.getItem('chat-theme') || 'dark')
     const [isJoined, setIsJoined] = useState(!!userName && !!senderId)
 
     // Screens: 'name' | 'lobby' | 'chat'
@@ -30,6 +31,15 @@ function App() {
     const [newRoomName, setNewRoomName] = useState('')
     const [lobbyError, setLobbyError] = useState('')
     const [lobbyLoading, setLobbyLoading] = useState(false)
+
+    // Persist theme
+    useEffect(() => {
+        localStorage.setItem('chat-theme', theme)
+        // Apply theme class to body also for the gradient background
+        document.body.className = `theme-${theme}`
+    }, [theme])
+
+    const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
 
     // Chat state
     const [messages, setMessages] = useState([])
@@ -254,7 +264,12 @@ function App() {
     // 1. Name Screen
     if (screen === 'name') {
         return (
-            <div className="app-container">
+            <div className={`app-container theme-${theme}`}>
+                <div className="theme-toggle-fixed">
+                    <button className="btn-icon" onClick={toggleTheme}>
+                        {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                    </button>
+                </div>
                 <div className="name-screen">
                     <div className="name-card">
                         <MessageSquare size={40} className="name-icon" />
@@ -280,10 +295,13 @@ function App() {
     // 2. Lobby Screen
     if (screen === 'lobby') {
         return (
-            <div className="app-container">
+            <div className={`app-container theme-${theme}`}>
                 <header className="lobby-header">
                     <h1>Buddy Squad</h1>
                     <div className="lobby-header-right">
+                        <button className="btn-icon" onClick={toggleTheme}>
+                            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
                         <span className="user-badge">{userName}</span>
                         <button className="btn-logout" onClick={handleLogout}>Change Name</button>
                     </div>
@@ -351,7 +369,7 @@ function App() {
 
     // 3. Chat Screen
     return (
-        <div className="app-container">
+        <div className={`app-container theme-${theme}`}>
             <header className="chat-header">
                 <div className="chat-header-left">
                     <button className="btn-icon" onClick={backToLobby} title="Back to Lobby">
@@ -363,6 +381,9 @@ function App() {
                     </div>
                 </div>
                 <div className="chat-header-right">
+                    <button className="btn-icon" onClick={toggleTheme} title="Toggle Theme">
+                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                    </button>
                     <button className="btn-copy" onClick={copyInviteLink} title="Copy invite link">
                         {copied ? <Check size={14} /> : <Copy size={14} />}
                         {copied ? 'Copied!' : 'Invite'}

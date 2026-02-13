@@ -10,6 +10,12 @@
     z-index: 10;
 }
 
+.theme-toggle-fixed {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+}
+
 /* ─── Shared Components ─────────────────────────── */
 .btn-primary {
     background: var(--accent-gradient);
@@ -95,6 +101,7 @@ input:focus {
     font-weight: 700;
     background: var(--accent-gradient);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
