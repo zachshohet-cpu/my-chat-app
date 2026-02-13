@@ -30,10 +30,23 @@ CREATE POLICY "Allow anon insert rooms" ON rooms FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anon select messages" ON messages FOR SELECT USING (true);
 CREATE POLICY "Allow anon insert messages" ON messages FOR INSERT WITH CHECK (true);
 
--- 4. ENABLE REALTIME
+-- 4. ROOM MEMBERS TABLE (tracks who joined which room)
+CREATE TABLE IF NOT EXISTS room_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
+  sender_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  joined_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE room_members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow anon select room_members" ON room_members FOR SELECT USING (true);
+CREATE POLICY "Allow anon insert room_members" ON room_members FOR INSERT WITH CHECK (true);
+
+-- 5. ENABLE REALTIME
 ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 
--- 5. INSERT DEFAULT ROOM
+-- 6. INSERT DEFAULT ROOM
 INSERT INTO rooms (name, invite_code) 
 VALUES ('Buddy Squad', 'buddysquad')
 ON CONFLICT (invite_code) DO NOTHING;

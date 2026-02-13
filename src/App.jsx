@@ -1,18 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from './lib/supabase'
+import { Copy, Check, ArrowLeft, Plus, LogIn, MessageSquare } from 'lucide-react'
 import './App.css'
 
+function generateInviteCode() {
+    const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)]
+    return code
+}
+
 function App() {
-    const [messages, setMessages] = useState([])
-    const [input, setInput] = useState('')
+    const [searchParams, setSearchParams] = useSearchParams()
+
+    // User identity
     const [userName, setUserName] = useState(localStorage.getItem('chat-name') || '')
     const [senderId, setSenderId] = useState(localStorage.getItem('chat-sender-id') || '')
     const [isJoined, setIsJoined] = useState(!!userName && !!senderId)
+
+    // Screens: 'name' | 'lobby' | 'chat'
+    const [screen, setScreen] = useState(isJoined ? 'lobby' : 'name')
+
+    // Lobby state
+    const [myRooms, setMyRooms] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('chat-rooms') || '[]') } catch { return [] }
+    })
+    const [joinCode, setJoinCode] = useState(searchParams.get('invite') || '')
+    const [newRoomName, setNewRoomName] = useState('')
+    const [lobbyError, setLobbyError] = useState('')
+    const [lobbyLoading, setLobbyLoading] = useState(false)
+
+    // Chat state
+    const [messages, setMessages] = useState([])
+    const [input, setInput] = useState('')
+    const [currentRoom, setCurrentRoom] = useState(null)
+    const [errorStatus, setErrorStatus] = useState(null)
+    const [countdown, setCountdown] = useState('')
+    const [copied, setCopied] = useState(false)
     const messagesEndRef = useRef(null)
 
-    const [errorStatus, setErrorStatus] = useState(null)
-    const [roomId, setRoomId] = useState(null)
-    const [countdown, setCountdown] = useState('')
+    // Generate sender ID on first visit
+    useEffect(() => {
+        if (!senderId) {
+            const newId = crypto.randomUUID()
+            localStorage.setItem('chat-sender-id', newId)
+            setSenderId(newId)
+        }
+    }, [senderId])
 
     // Countdown timer to next cleanup (midnight UTC)
     useEffect(() => {
@@ -32,92 +67,162 @@ function App() {
         return () => clearInterval(interval)
     }, [])
 
+    // Auto-join from invite link
     useEffect(() => {
-        // Generate a unique ID if one doesn't exist
-        if (!senderId) {
-            const newId = crypto.randomUUID()
-            localStorage.setItem('chat-sender-id', newId)
-            setSenderId(newId)
+        const inviteCode = searchParams.get('invite')
+        if (inviteCode && isJoined) {
+            setJoinCode(inviteCode)
+            handleJoinRoom(null, inviteCode)
         }
-    }, [senderId])
+    }, [isJoined]) // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Save rooms to localStorage whenever they change
     useEffect(() => {
-        // 1. Find the default room ID
-        const getRoom = async () => {
-            const { data, error } = await supabase
-                .from('rooms')
-                .select('id')
-                .eq('invite_code', 'buddysquad')
-                .single()
+        localStorage.setItem('chat-rooms', JSON.stringify(myRooms))
+    }, [myRooms])
 
-            if (data) setRoomId(data.id)
-            if (error) {
-                console.error('Error finding room:', error)
-                setErrorStatus('Database tables missing. Did you run the SQL setup?')
-            }
-        }
-        getRoom()
-    }, [])
-
+    // Chat: fetch messages + realtime subscription
     useEffect(() => {
-        if (!isJoined || !roomId) return
+        if (screen !== 'chat' || !currentRoom) return
 
-        // 2. Fetch messages for THIS room
         const fetchMessages = async () => {
             const { data, error } = await supabase
                 .from('messages')
                 .select('*')
-                .eq('room_id', roomId)
+                .eq('room_id', currentRoom.id)
                 .order('created_at', { ascending: true })
                 .limit(100)
 
             if (data) setMessages(data)
             if (error) {
                 console.error('Error fetching messages:', error)
-                setErrorStatus('Could not load messages. Check your console!')
+                setErrorStatus('Could not load messages.')
             }
         }
 
         fetchMessages()
 
-        // 3. Listen for new messages
         const channel = supabase
-            .channel('public:messages')
+            .channel(`room:${currentRoom.id}`)
             .on('postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
+                { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${currentRoom.id}` },
                 (payload) => {
                     setMessages((prev) => [...prev, payload.new])
                 }
             )
             .subscribe()
 
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [isJoined, roomId])
+        return () => { supabase.removeChannel(channel) }
+    }, [screen, currentRoom])
 
+    // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
-    const handleJoin = (e) => {
+    // ─── Actions ─────────────────────────────────────────
+
+    const handleNameSubmit = (e) => {
         e.preventDefault()
         if (userName.trim()) {
             localStorage.setItem('chat-name', userName)
-            // senderId is handled by the useEffect
             setIsJoined(true)
+            setScreen('lobby')
         }
+    }
+
+    const handleCreateRoom = async (e) => {
+        e.preventDefault()
+        if (!newRoomName.trim()) return
+        setLobbyLoading(true)
+        setLobbyError('')
+
+        const inviteCode = generateInviteCode()
+        const { data, error } = await supabase
+            .from('rooms')
+            .insert([{ name: newRoomName.trim(), invite_code: inviteCode }])
+            .select()
+            .single()
+
+        if (error) {
+            setLobbyError('Failed to create room: ' + error.message)
+            setLobbyLoading(false)
+            return
+        }
+
+        // Add to room_members
+        await supabase.from('room_members').insert([{
+            room_id: data.id,
+            sender_id: senderId,
+            display_name: userName,
+        }])
+
+        const room = { id: data.id, name: data.name, invite_code: data.invite_code }
+        setMyRooms(prev => [...prev.filter(r => r.id !== room.id), room])
+        setNewRoomName('')
+        setLobbyLoading(false)
+        enterRoom(room)
+    }
+
+    const handleJoinRoom = async (e, codeOverride) => {
+        if (e) e.preventDefault()
+        const code = (codeOverride || joinCode).trim().toLowerCase()
+        if (!code) return
+        setLobbyLoading(true)
+        setLobbyError('')
+
+        const { data, error } = await supabase
+            .from('rooms')
+            .select('id, name, invite_code')
+            .eq('invite_code', code)
+            .single()
+
+        if (error || !data) {
+            setLobbyError('No room found with that invite code.')
+            setLobbyLoading(false)
+            return
+        }
+
+        // Add to room_members (ignore if already there)
+        await supabase.from('room_members').insert([{
+            room_id: data.id,
+            sender_id: senderId,
+            display_name: userName,
+        }])
+
+        const room = { id: data.id, name: data.name, invite_code: data.invite_code }
+        setMyRooms(prev => [...prev.filter(r => r.id !== room.id), room])
+        setJoinCode('')
+        setLobbyLoading(false)
+
+        // Clear the invite param from the URL
+        searchParams.delete('invite')
+        setSearchParams(searchParams, { replace: true })
+
+        enterRoom(room)
+    }
+
+    const enterRoom = (room) => {
+        setCurrentRoom(room)
+        setMessages([])
+        setErrorStatus(null)
+        setScreen('chat')
+    }
+
+    const backToLobby = () => {
+        setCurrentRoom(null)
+        setScreen('lobby')
     }
 
     const sendMessage = async (e) => {
         e.preventDefault()
-        if (!input.trim() || !roomId || !senderId) return
+        if (!input.trim() || !currentRoom || !senderId) return
 
         const newMessage = {
             content: input,
             sender_name: userName,
-            sender_id: senderId, // Fix: Include the missing sender_id
-            room_id: roomId, // Critical: associate with room
+            sender_id: senderId,
+            room_id: currentRoom.id,
             created_at: new Date().toISOString(),
         }
 
@@ -130,49 +235,141 @@ function App() {
         }
     }
 
-    if (!isJoined) {
+    const copyInviteLink = () => {
+        const url = `${window.location.origin}?invite=${currentRoom.invite_code}`
+        navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    // ─── Screens ─────────────────────────────────────────
+
+    // 1. Name Screen
+    if (screen === 'name') {
         return (
             <div className="app-container">
-                <div className="chat-window" style={{ justifyContent: 'center', alignItems: 'center', padding: '40px' }}>
-                    <h2>Buddy Squad</h2>
-                    {errorStatus && <p style={{ color: '#ff4d4d', fontSize: '0.9rem' }}>⚠️ {errorStatus}</p>}
-                    <form onSubmit={handleJoin} style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '300px' }}>
-                        <input
-                            type="text"
-                            placeholder="Your display name..."
-                            value={userName}
-                            onChange={(e) => setUserName(e.target.value)}
-                            required
-                        />
-                        <button type="submit">Enter Chat</button>
-                    </form>
+                <div className="name-screen">
+                    <div className="name-card">
+                        <MessageSquare size={40} className="name-icon" />
+                        <h2>Buddy Squad</h2>
+                        <p className="subtitle">Enter your name to get started</p>
+                        <form onSubmit={handleNameSubmit}>
+                            <input
+                                type="text"
+                                placeholder="Your display name..."
+                                value={userName}
+                                onChange={(e) => setUserName(e.target.value)}
+                                required
+                                autoFocus
+                            />
+                            <button type="submit" className="btn-primary">Continue</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         )
     }
 
+    // 2. Lobby Screen
+    if (screen === 'lobby') {
+        return (
+            <div className="app-container">
+                <header className="lobby-header">
+                    <h1>Buddy Squad</h1>
+                    <span className="user-badge">{userName}</span>
+                </header>
+
+                {lobbyError && <div className="error-banner">⚠️ {lobbyError}</div>}
+
+                <div className="lobby-grid">
+                    {/* Create Room */}
+                    <div className="lobby-card">
+                        <h3><Plus size={18} /> Create a Room</h3>
+                        <form onSubmit={handleCreateRoom}>
+                            <input
+                                type="text"
+                                placeholder="Room name..."
+                                value={newRoomName}
+                                onChange={(e) => setNewRoomName(e.target.value)}
+                                required
+                            />
+                            <button type="submit" className="btn-primary" disabled={lobbyLoading}>
+                                {lobbyLoading ? 'Creating...' : 'Create'}
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* Join Room */}
+                    <div className="lobby-card">
+                        <h3><LogIn size={18} /> Join a Room</h3>
+                        <form onSubmit={handleJoinRoom}>
+                            <input
+                                type="text"
+                                placeholder="Invite code..."
+                                value={joinCode}
+                                onChange={(e) => setJoinCode(e.target.value)}
+                                required
+                            />
+                            <button type="submit" className="btn-primary" disabled={lobbyLoading}>
+                                {lobbyLoading ? 'Joining...' : 'Join'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {/* My Rooms */}
+                {myRooms.length > 0 && (
+                    <div className="my-rooms">
+                        <h3>My Rooms</h3>
+                        <div className="room-list">
+                            {myRooms.map(room => (
+                                <button
+                                    key={room.id}
+                                    className="room-item"
+                                    onClick={() => enterRoom(room)}
+                                >
+                                    <span className="room-name">{room.name}</span>
+                                    <span className="room-code">{room.invite_code}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // 3. Chat Screen
     return (
         <div className="app-container">
-            <header style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1 style={{ fontSize: '1.2rem', margin: 0 }}>Buddy Squad</h1>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#ff9f43', background: '#2a1f0e', padding: '4px 10px', borderRadius: '6px', fontFamily: 'monospace' }}>
-                        🧹 {countdown}
+            <header className="chat-header">
+                <div className="chat-header-left">
+                    <button className="btn-icon" onClick={backToLobby} title="Back to Lobby">
+                        <ArrowLeft size={18} />
+                    </button>
+                    <div>
+                        <h1 className="chat-title">{currentRoom?.name || 'Chat'}</h1>
+                        <span className="chat-code">Code: {currentRoom?.invite_code}</span>
                     </div>
-                    <span style={{ fontSize: '0.8rem', color: '#888' }}>{userName}</span>
+                </div>
+                <div className="chat-header-right">
+                    <button className="btn-copy" onClick={copyInviteLink} title="Copy invite link">
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                        {copied ? 'Copied!' : 'Invite'}
+                    </button>
+                    <div className="countdown-badge">🧹 {countdown}</div>
+                    <span className="user-badge-small">{userName}</span>
                 </div>
             </header>
 
-            {errorStatus && <div style={{ background: '#4a1d1d', padding: '10px', borderRadius: '8px', marginBottom: '10px', textAlign: 'center' }}>{errorStatus}</div>}
+            {errorStatus && <div className="error-banner">{errorStatus}</div>}
 
             <div className="chat-window">
                 <div className="messages">
                     {messages.length === 0 && <p style={{ textAlign: 'center', color: '#666' }}>No messages yet. Say hello!</p>}
                     {messages.map((msg, idx) => (
-                        <div key={idx} className={`message ${msg.sender_name === userName ? 'own' : 'other'}`}>
-                            <div style={{ fontSize: '0.7rem', opacity: 0.7, marginBottom: '4px' }}>
-                                {msg.sender_name}
-                            </div>
+                        <div key={idx} className={`message ${msg.sender_id === senderId ? 'own' : 'other'}`}>
+                            <div className="message-sender">{msg.sender_name}</div>
                             <div>{msg.content}</div>
                         </div>
                     ))}
@@ -185,6 +382,7 @@ function App() {
                         placeholder="Type a message..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        autoFocus
                     />
                     <button type="submit" disabled={!input.trim()}>Send</button>
                 </form>

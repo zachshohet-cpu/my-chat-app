@@ -1,3 +1,4 @@
+/* ─── Global ─────────────────────────────────────── */
 .app-container {
     max-width: 800px;
     margin: 0 auto;
@@ -7,6 +8,250 @@
     padding: 20px;
 }
 
+/* ─── Name Screen ────────────────────────────────── */
+.name-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.name-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.name-icon {
+    color: #0070f3;
+    margin-bottom: 12px;
+}
+
+.name-card h2 {
+    margin: 0 0 6px;
+    font-size: 1.5rem;
+}
+
+.subtitle {
+    color: #888;
+    font-size: 0.85rem;
+    margin: 0 0 20px;
+}
+
+.name-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ─── Lobby ──────────────────────────────────────── */
+.lobby-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.lobby-header h1 {
+    font-size: 1.3rem;
+    margin: 0;
+}
+
+.user-badge {
+    font-size: 0.8rem;
+    color: #aaa;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.lobby-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 600px) {
+    .lobby-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.lobby-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.lobby-card h3 {
+    margin: 0 0 14px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+}
+
+.lobby-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.error-banner {
+    background: #4a1d1d;
+    color: #ff6b6b;
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+/* My Rooms */
+.my-rooms h3 {
+    font-size: 0.9rem;
+    color: #888;
+    margin: 0 0 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.room-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: white;
+    width: 100%;
+    text-align: left;
+    font-size: 0.95rem;
+}
+
+.room-item:hover {
+    background: #222;
+    border-color: #0070f3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 112, 243, 0.15);
+}
+
+.room-name {
+    font-weight: 600;
+}
+
+.room-code {
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: #666;
+    background: #111;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+/* ─── Chat Header ────────────────────────────────── */
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chat-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chat-title {
+    font-size: 1.1rem;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.chat-code {
+    font-size: 0.7rem;
+    color: #666;
+    font-family: monospace;
+}
+
+.chat-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-icon {
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background 0.15s;
+}
+
+.btn-icon:hover {
+    background: #333;
+}
+
+.btn-copy {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #1a3a1a;
+    border: 1px solid #2d5a2d;
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: #4ade80;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-copy:hover {
+    background: #224422;
+}
+
+.countdown-badge {
+    font-size: 0.72rem;
+    color: #ff9f43;
+    background: #2a1f0e;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: monospace;
+}
+
+.user-badge-small {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+/* ─── Chat Window ────────────────────────────────── */
 .chat-window {
     flex: 1;
     background: #1a1a1a;
@@ -47,6 +292,12 @@
     background: #333;
 }
 
+.message-sender {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    margin-bottom: 4px;
+}
+
 .input-area {
     padding: 16px;
     background: #111;
@@ -55,6 +306,7 @@
     gap: 12px;
 }
 
+/* ─── Shared ─────────────────────────────────────── */
 input {
     flex: 1;
     background: #222;
@@ -63,6 +315,7 @@ input {
     padding: 10px 14px;
     color: white;
     outline: none;
+    font-size: 0.9rem;
 }
 
 input:focus {
@@ -77,6 +330,7 @@ button {
     color: white;
     font-weight: 600;
     cursor: pointer;
+    font-size: 0.9rem;
 }
 
 button:hover {
@@ -86,4 +340,9 @@ button:hover {
 button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.btn-primary {
+    padding: 10px 20px;
+    width: 100%;
 }
