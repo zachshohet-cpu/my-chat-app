@@ -131,6 +131,13 @@ function App() {
         }
     }
 
+    const handleLogout = () => {
+        localStorage.removeItem('chat-name')
+        setIsJoined(false)
+        setUserName('')
+        setScreen('name')
+    }
+
     const handleCreateRoom = async (e) => {
         e.preventDefault()
         if (!newRoomName.trim()) return
@@ -276,7 +283,10 @@ function App() {
             <div className="app-container">
                 <header className="lobby-header">
                     <h1>Buddy Squad</h1>
-                    <span className="user-badge">{userName}</span>
+                    <div className="lobby-header-right">
+                        <span className="user-badge">{userName}</span>
+                        <button className="btn-logout" onClick={handleLogout}>Change Name</button>
+                    </div>
                 </header>
 
                 {lobbyError && <div className="error-banner">⚠️ {lobbyError}</div>}
