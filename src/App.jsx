@@ -12,6 +12,25 @@ function App() {
 
     const [errorStatus, setErrorStatus] = useState(null)
     const [roomId, setRoomId] = useState(null)
+    const [countdown, setCountdown] = useState('')
+
+    // Countdown timer to next cleanup (midnight UTC)
+    useEffect(() => {
+        const updateCountdown = () => {
+            const now = new Date()
+            const nextMidnight = new Date(now)
+            nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1)
+            nextMidnight.setUTCHours(0, 0, 0, 0)
+            const diff = nextMidnight - now
+            const hours = String(Math.floor(diff / (1000 * 60 * 60))).padStart(2, '0')
+            const minutes = String(Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0')
+            const seconds = String(Math.floor((diff % (1000 * 60)) / 1000)).padStart(2, '0')
+            setCountdown(`${hours}:${minutes}:${seconds}`)
+        }
+        updateCountdown()
+        const interval = setInterval(updateCountdown, 1000)
+        return () => clearInterval(interval)
+    }, [])
 
     useEffect(() => {
         // Generate a unique ID if one doesn't exist
@@ -136,7 +155,12 @@ function App() {
         <div className="app-container">
             <header style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1 style={{ fontSize: '1.2rem', margin: 0 }}>Buddy Squad</h1>
-                <span style={{ fontSize: '0.8rem', color: '#888' }}>{userName}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#ff9f43', background: '#2a1f0e', padding: '4px 10px', borderRadius: '6px', fontFamily: 'monospace' }}>
+                        🧹 {countdown}
+                    </div>
+                    <span style={{ fontSize: '0.8rem', color: '#888' }}>{userName}</span>
+                </div>
             </header>
 
             {errorStatus && <div style={{ background: '#4a1d1d', padding: '10px', borderRadius: '8px', marginBottom: '10px', textAlign: 'center' }}>{errorStatus}</div>}
