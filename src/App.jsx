@@ -6,11 +6,21 @@ function App() {
     const [messages, setMessages] = useState([])
     const [input, setInput] = useState('')
     const [userName, setUserName] = useState(localStorage.getItem('chat-name') || '')
-    const [isJoined, setIsJoined] = useState(!!userName)
+    const [senderId, setSenderId] = useState(localStorage.getItem('chat-sender-id') || '')
+    const [isJoined, setIsJoined] = useState(!!userName && !!senderId)
     const messagesEndRef = useRef(null)
 
     const [errorStatus, setErrorStatus] = useState(null)
     const [roomId, setRoomId] = useState(null)
+
+    useEffect(() => {
+        // Generate a unique ID if one doesn't exist
+        if (!senderId) {
+            const newId = crypto.randomUUID()
+            localStorage.setItem('chat-sender-id', newId)
+            setSenderId(newId)
+        }
+    }, [senderId])
 
     useEffect(() => {
         // 1. Find the default room ID
@@ -75,17 +85,19 @@ function App() {
         e.preventDefault()
         if (userName.trim()) {
             localStorage.setItem('chat-name', userName)
+            // senderId is handled by the useEffect
             setIsJoined(true)
         }
     }
 
     const sendMessage = async (e) => {
         e.preventDefault()
-        if (!input.trim() || !roomId) return
+        if (!input.trim() || !roomId || !senderId) return
 
         const newMessage = {
             content: input,
             sender_name: userName,
+            sender_id: senderId, // Fix: Include the missing sender_id
             room_id: roomId, // Critical: associate with room
             created_at: new Date().toISOString(),
         }
