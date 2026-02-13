@@ -9,34 +9,63 @@ function App() {
     const [isJoined, setIsJoined] = useState(!!userName)
     const messagesEndRef = useRef(null)
 
-    useEffect(() => {
-        if (!isJoined) return
+    const [errorStatus, setErrorStatus] = useState(null)
+    const [roomId, setRoomId] = useState(null)
 
-        // Fetch initial messages
+    useEffect(() => {
+        // 1. Find the default room ID
+        const getRoom = async () => {
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('id')
+                .eq('invite_code', 'buddysquad')
+                .single()
+
+            if (data) setRoomId(data.id)
+            if (error) {
+                console.error('Error finding room:', error)
+                setErrorStatus('Database tables missing. Did you run the SQL setup?')
+            }
+        }
+        getRoom()
+    }, [])
+
+    useEffect(() => {
+        if (!isJoined || !roomId) return
+
+        // 2. Fetch messages for THIS room
         const fetchMessages = async () => {
             const { data, error } = await supabase
                 .from('messages')
                 .select('*')
+                .eq('room_id', roomId)
                 .order('created_at', { ascending: true })
                 .limit(100)
 
             if (data) setMessages(data)
+            if (error) {
+                console.error('Error fetching messages:', error)
+                setErrorStatus('Could not load messages. Check your console!')
+            }
         }
 
         fetchMessages()
 
-        // Subscribe to new messages
+        // 3. Listen for new messages
         const channel = supabase
             .channel('public:messages')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-                setMessages((prev) => [...prev, payload.new])
-            })
+            .on('postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
+                (payload) => {
+                    setMessages((prev) => [...prev, payload.new])
+                }
+            )
             .subscribe()
 
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [isJoined])
+    }, [isJoined, roomId])
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -52,34 +81,39 @@ function App() {
 
     const sendMessage = async (e) => {
         e.preventDefault()
-        if (!input.trim()) return
+        if (!input.trim() || !roomId) return
 
         const newMessage = {
             content: input,
             sender_name: userName,
+            room_id: roomId, // Critical: associate with room
             created_at: new Date().toISOString(),
         }
 
-        setInput('')
-
         const { error } = await supabase.from('messages').insert([newMessage])
-        if (error) console.error('Error sending message:', error)
+        if (error) {
+            console.error('Error sending message:', error)
+            alert('Failed to send: ' + error.message)
+        } else {
+            setInput('')
+        }
     }
 
     if (!isJoined) {
         return (
             <div className="app-container">
                 <div className="chat-window" style={{ justifyContent: 'center', alignItems: 'center', padding: '40px' }}>
-                    <h2>Welcome to Buddy Squad</h2>
+                    <h2>Buddy Squad</h2>
+                    {errorStatus && <p style={{ color: '#ff4d4d', fontSize: '0.9rem' }}>⚠️ {errorStatus}</p>}
                     <form onSubmit={handleJoin} style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '300px' }}>
                         <input
                             type="text"
-                            placeholder="Enter your name..."
+                            placeholder="Your display name..."
                             value={userName}
                             onChange={(e) => setUserName(e.target.value)}
                             required
                         />
-                        <button type="submit">Join Chat</button>
+                        <button type="submit">Enter Chat</button>
                     </form>
                 </div>
             </div>
@@ -90,8 +124,10 @@ function App() {
         <div className="app-container">
             <header style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1 style={{ fontSize: '1.2rem', margin: 0 }}>Buddy Squad</h1>
-                <span style={{ fontSize: '0.8rem', color: '#888' }}>Logged in as {userName}</span>
+                <span style={{ fontSize: '0.8rem', color: '#888' }}>{userName}</span>
             </header>
+
+            {errorStatus && <div style={{ background: '#4a1d1d', padding: '10px', borderRadius: '8px', marginBottom: '10px', textAlign: 'center' }}>{errorStatus}</div>}
 
             <div className="chat-window">
                 <div className="messages">
